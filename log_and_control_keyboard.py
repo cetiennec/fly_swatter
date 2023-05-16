@@ -36,6 +36,8 @@ from cflib.utils import uri_helper
 
 import keyboard  # using module keyboard
 
+from mapping import Map
+
 
 uri = uri_helper.uri_from_env(default='radio://0/70/2M/E7E7E7E707')
 
@@ -67,6 +69,8 @@ class LoggingExample:
 
         # Variable used to keep main loop occupied until disconnect
         self.is_connected = True
+
+        self.states = dict()
 
     def _connected(self, link_uri):
         """ This callback is called form the Crazyflie API when a Crazyflie
@@ -104,7 +108,7 @@ class LoggingExample:
             print('Could not add Stabilizer log config, bad configuration.')
 
         # Start a timer to disconnect in 10s
-        t = Timer(50, self._cf.close_link)
+        t = Timer(100, self._cf.close_link)
         t.start()
 
     def _stab_log_error(self, logconf, msg):
@@ -113,10 +117,12 @@ class LoggingExample:
 
     def _stab_log_data(self, timestamp, data, logconf):
         """Callback from a the log API when data arrives"""
-        print(f'[{timestamp}][{logconf.name}]: ', end='')
+        # print(f'[{timestamp}][{logconf.name}]: ', end='')
+        # for name, value in data.items():
+        #     print(f'{name}: {value:3.3f} ', end='')
+        # print()
         for name, value in data.items():
-            print(f'{name}: {value:3.3f} ', end='')
-        print()
+            self.states[name] = value
 
     def _connection_failed(self, link_uri, msg):
         """Callback when connection initial connection fails (i.e no Crazyflie
@@ -180,6 +186,9 @@ if __name__ == '__main__':
     cf.param.set_value('kalman.resetEstimation', '0')
     time.sleep(2)
 
+    map = Map()
+    map.display_cell_map()
+
     # The Crazyflie lib doesn't contain anything to keep the application alive,
     # so this is where your application should do something. In our case we
     # are just waiting until we are disconnected.
@@ -196,7 +205,13 @@ if __name__ == '__main__':
         for _ in range(250):
             command = action_from_keyboard()
             cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
-            #cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
+            # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
+            map.update_map(le.states)
+            start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
+            print(start_cell)
+            map.perform_a_star(start_cell,(1,1))
+            map.display_cell_map(le.states)
+            
             time.sleep(0.1)
 
         for _ in range(20):
