@@ -147,23 +147,23 @@ if __name__ == '__main__':
         altitude = 0.5
         #key = self.keyboard.getKey()
         try:  # used try so that if user pressed other than the given key error will not be shown
-            if keyboard.is_pressed('w'):  # if key 'q' is pressed
-                print('You Pressed z!')
+            if keyboard.is_pressed('i'):  # if key 'i' is pressed
+                print('You Pressed i!')
                 forward_velocity = 0.3
-            if keyboard.is_pressed('s'):  # if key 'q' is pressed
-                print('You Pressed s!')
+            if keyboard.is_pressed('k'):  # if key 'k' is pressed
+                print('You Pressed k!')
                 forward_velocity = -0.3
-            if keyboard.is_pressed('a'):  # if key 'q' is pressed
-                print('You Pressed q!')
+            if keyboard.is_pressed('l'):  # if key 'l' is pressed
+                print('You Pressed l!')
                 left_velocity = -0.3
-            if keyboard.is_pressed('d'):  # if key 'q' is pressed
-                print('You Pressed d!')
+            if keyboard.is_pressed('j'):  # if key 'j' is pressed
+                print('You Pressed j!')
                 left_velocity = 0.3
-            if keyboard.is_pressed('q'):  # if key 'q' is pressed
-                print('You Pressed a!')
+            if keyboard.is_pressed('u'):  # if key 'u' is pressed
+                print('You Pressed u!')
                 yaw_rate = 50
-            if keyboard.is_pressed('e'):  # if key 'q' is pressed
-                print('You Pressed e!')
+            if keyboard.is_pressed('o'):  # if key 'o' is pressed
+                print('You Pressed o!')
                 yaw_rate = -50
 
             return [forward_velocity, left_velocity, yaw_rate, altitude]

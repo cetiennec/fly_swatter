@@ -45,7 +45,6 @@ SENSOR_TH = 2000
 # Set the speed factor for moving and rotating
 SPEED_FACTOR = 0.3
 
-#Random comment
 
 # Only output errors from the logging framework
 logging.basicConfig(level=logging.INFO)
