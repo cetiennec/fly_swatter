@@ -208,8 +208,16 @@ if __name__ == '__main__':
             # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
             map.update_map(le.states)
             start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
-            print(start_cell)
-            map.perform_a_star(start_cell,(1,1))
+            map.perform_a_star(start_cell,(10,1))
+            if len(map.optimal_cell_path) > 1 :
+                target_pos = map.pos_from_cell(map.optimal_cell_path[1])
+                cf.commander.send_position_setpoint(target_pos[0] - 2.5,
+                                                    target_pos[1] - 1.5,
+                                                    0.5,
+                                                    0)
+            else :
+                break
+
             map.display_cell_map(le.states)
             
             time.sleep(0.1)
