@@ -161,10 +161,10 @@ if __name__ == '__main__':
                 left_velocity = 0.3
             if keyboard.is_pressed('u'):  # if key 'u' is pressed
                 print('You Pressed u!')
-                yaw_rate = 50
+                yaw_rate = -50
             if keyboard.is_pressed('o'):  # if key 'o' is pressed
                 print('You Pressed o!')
-                yaw_rate = -50
+                yaw_rate = 50
 
             return [forward_velocity, left_velocity, yaw_rate, altitude]
         except:
