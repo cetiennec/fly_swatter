@@ -72,6 +72,10 @@ class LoggingExample:
 
         self.states = dict()
 
+        self.old_measurement = 0
+        self.old_filtered = 0
+        self.hand_stopped = False
+
     def _connected(self, link_uri):
         """ This callback is called form the Crazyflie API when a Crazyflie
         has been connected and the TOCs have been downloaded."""
@@ -139,6 +143,18 @@ class LoggingExample:
         """Callback when the Crazyflie is disconnected (called in all cases)"""
         print('Disconnected from %s' % link_uri)
         self.is_connected = False
+
+    def HP_filter(self,new_value):
+        filtered = 0.01*self.old_filtered + 0.01*(new_value-self.old_measurement )
+
+        if filtered-self.old_filtered>=0.6 and self.old_measurement !=0:
+            print('FOUND LANDING PAD UPP')
+        elif filtered - self.old_filtered <= -0.7 and self.old_measurement !=0:
+            print('FOUND LANDING PAD DOWN')
+        self.old_filtered = filtered
+        self.old_measurement = new_value
+
+        return filtered
 
 
 if __name__ == '__main__':
