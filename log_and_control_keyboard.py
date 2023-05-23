@@ -91,6 +91,7 @@ class LoggingExample:
         self._lg_stab.add_variable('range.back')
         self._lg_stab.add_variable('range.left')
         self._lg_stab.add_variable('range.right')
+        self._lg_stab.add_variable('range.zrange')
         # The fetch-as argument can be set to FP16 to save space in the log packet
         # self._lg_stab.add_variable('pm.vbat', 'FP16')
 
