@@ -154,22 +154,22 @@ if __name__ == '__main__':
         #key = self.keyboard.getKey()
         try:  # used try so that if user pressed other than the given key error will not be shown
             if keyboard.is_pressed('i'):  # if key 'i' is pressed
-                print('You Pressed i!')
+                # print('You Pressed i!')
                 forward_velocity = 0.3
             if keyboard.is_pressed('k'):  # if key 'k' is pressed
-                print('You Pressed k!')
+                # print('You Pressed k!')
                 forward_velocity = -0.3
             if keyboard.is_pressed('l'):  # if key 'l' is pressed
-                print('You Pressed l!')
+                # print('You Pressed l!')
                 left_velocity = -0.3
             if keyboard.is_pressed('j'):  # if key 'j' is pressed
-                print('You Pressed j!')
+                # print('You Pressed j!')
                 left_velocity = 0.3
             if keyboard.is_pressed('u'):  # if key 'u' is pressed
-                print('You Pressed u!')
+                # print('You Pressed u!')
                 yaw_rate = -50
             if keyboard.is_pressed('o'):  # if key 'o' is pressed
-                print('You Pressed o!')
+                # print('You Pressed o!')
                 yaw_rate = 50
 
             return [forward_velocity, left_velocity, yaw_rate, altitude]
@@ -187,8 +187,8 @@ if __name__ == '__main__':
     time.sleep(2)
 
     map = Map()
-    map.display_cell_map()
-
+    # map.display_cell_map()
+    map.display_map_using_cv()
     # The Crazyflie lib doesn't contain anything to keep the application alive,
     # so this is where your application should do something. In our case we
     # are just waiting until we are disconnected.
@@ -209,16 +209,17 @@ if __name__ == '__main__':
             map.update_map(le.states)
             start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
             map.perform_a_star(start_cell,(10,1))
-            if len(map.optimal_cell_path) > 1 :
-                target_pos = map.pos_from_cell(map.optimal_cell_path[1])
-                cf.commander.send_position_setpoint(target_pos[0] - 2.5,
-                                                    target_pos[1] - 1.5,
-                                                    0.5,
-                                                    0)
-            else :
-                break
+            # if len(map.optimal_cell_path) > 1 :
+            #     target_pos = map.pos_from_cell(map.optimal_cell_path[1])
+            #     cf.commander.send_position_setpoint(target_pos[0] - 2.5,
+            #                                         target_pos[1] - 1.5,
+            #                                         0.5,
+            #                                         0)
+            # else :
+            #     break
 
-            map.display_cell_map(le.states)
+
+            map.display_map_using_cv(le.states)
             
             time.sleep(0.1)
 

@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
+
+# use the following command for opencv : pip install opencv-contrib-python
 
 class Map :
     def __init__(self):
@@ -9,6 +12,7 @@ class Map :
         self.res_pos = 0.15  # meter, must be inferior to size of landing pad
 
         self.size_of_grown_margin = 1  # in number of cells
+        self.use_diagonal_neighbors = True
 
         self.range_max = 1.1  # meter, maximum range of distance sensor
         self.conf = 0.2  # certainty given by each measurement
@@ -26,6 +30,9 @@ class Map :
         self.optimal_cell_path = None
 
         self.plot_ready = False
+
+
+#%% Update Map
 
     def update_map(self, sensor_data):
         """Update map from sensor_data, will increase or decrease the certainty value on cells for which the sensors have a measurement"""
@@ -87,6 +94,7 @@ class Map :
 
         self.grown_map = np.clip(self.grown_map, -1, 1)  # certainty can never be more than 100%
 
+#%% Utils
 
     def pos_from_cell(self, cell):
         return (
@@ -99,6 +107,65 @@ class Map :
         idx_y = int(np.round((position[0] - self.min_x) / self.res_pos, 0))
         return (idx_x, idx_y)
     
+    def merge_sorted_list(self, list1, list2, heuristics1, heuristics2):
+        result_list = []
+        heuristics = []
+        while len(list1) > 0 and len(list2) > 0:
+            if heuristics1[0] > heuristics2[0]:
+                result_list.append(list2.pop(0))
+                heuristics.append(heuristics2.pop(0))
+            else:
+                result_list.append(list1.pop(0))
+                heuristics.append(heuristics1.pop(0))
+
+        for element in list1:
+            result_list.append(element)
+            heuristics.append(heuristics1.pop(0))
+
+        for element in list2:
+            result_list.append(element)
+            heuristics.append(heuristics2.pop(0))
+
+        return result_list, heuristics
+    
+    def find_neighbors(self, cell):
+        cell_neighbors = []
+        distances = []
+
+        if self.use_diagonal_neighbors :
+            for i in [-1, 0, 1]:
+                for j in [-1, 0, 1]:
+                    if (
+                        (i != 0 or j != 0)
+                        and cell[0] + i >= 0
+                        and cell[0] + i < self.grown_map.shape[0]
+                        and cell[1] + j >= 0
+                        and cell[1] + j < self.grown_map.shape[1]
+                    ):
+                        cell_neighbors.append((cell[0] + i, cell[1] + j))
+                        distances.append(self.distance((0, 0), (i, j)))
+        else :
+            for i in [-1, 1]:
+                if (
+                    cell[0] + i >= 0
+                    and cell[0] + i < self.grown_map.shape[0]
+                ):
+                    cell_neighbors.append((cell[0] + i, cell[1]))
+                    distances.append(abs(i))
+            for j in [-1, 1]:
+                if (
+                    cell[1] + j >= 0
+                    and cell[1] + j < self.grown_map.shape[1]
+                ):
+                    cell_neighbors.append((cell[0], cell[1] + j))
+                    distances.append(abs(j))
+        return cell_neighbors, distances
+    
+    def distance(self,cell_a,cell_b) :
+        return np.linalg.norm(np.array(cell_a) - np.array(cell_b))
+    
+
+#%% Display the map
     def display_cell_map(self, sensor_data=None):
         if not self.plot_ready:
             plt.ion()
@@ -140,32 +207,38 @@ class Map :
             )
 
         plt.pause(0.001)
+
+    def display_map_using_cv(self, sensor_data = None):
+        upscaling_factor = 20
+        gray_image = np.transpose(self.grown_map)
+        gray_image = (gray_image+1)/2
+        
+
+
+        (width, height) = np.shape(gray_image)
+
+        gray_image = cv2.resize(gray_image,(upscaling_factor*height, upscaling_factor*width) , interpolation=cv2.INTER_NEAREST)
+        
+        map_image = cv2.cvtColor(gray_image.astype('float32'), cv2.COLOR_GRAY2BGR)
+        if self.optimal_cell_path is not None:
+            for cell in self.optimal_cell_path :
+                cv2.circle(map_image, (upscaling_factor*cell[0],upscaling_factor*cell[1]), int(upscaling_factor*0.7),(0,255,0),-1)
+
+        if sensor_data is not None :
+            idx_x, idx_y = self.cell_from_pos(
+                [2.5 + sensor_data["stateEstimate.x"], 1.5 + sensor_data["stateEstimate.y"]]
+            )
+            cv2.circle(map_image, (upscaling_factor*idx_x, upscaling_factor*idx_y), int(upscaling_factor*0.5),(255,0, 0),-1)
+
+        map_image = np.flip(map_image, axis= 0)
+        cv2.imshow('Cell map and planned path', map_image)
+        cv2.waitKey(1)
     
-    def distance(self, cell_a, cell_b):
-        return np.linalg.norm(np.array(cell_a) - np.array(cell_b))
 
-    def merge_sorted_list(self, list1, list2, heuristics1, heuristics2):
-        result_list = []
-        heuristics = []
-        while len(list1) > 0 and len(list2) > 0:
-            if heuristics1[0] > heuristics2[0]:
-                result_list.append(list2.pop(0))
-                heuristics.append(heuristics2.pop(0))
-            else:
-                result_list.append(list1.pop(0))
-                heuristics.append(heuristics1.pop(0))
 
-        for element in list1:
-            result_list.append(element)
-            heuristics.append(heuristics1.pop(0))
 
-        for element in list2:
-            result_list.append(element)
-            heuristics.append(heuristics2.pop(0))
-
-        return result_list, heuristics
     
-     # %% Path planning
+#%% Path planning : A* algorithm
     def perform_a_star(self, start_cell, target_cell):
         self.grown_map_astar = np.zeros_like(self.grown_map)  # unmarked at 0
         self.grown_map_astar[self.grown_map < 0] = -1  # to keep convention
@@ -241,19 +314,14 @@ class Map :
 
         self.optimal_cell_path.reverse()
 
-    def find_neighbors(self, cell):
-        cell_neighbors = []
-        distances = []
+# map = Map()
+# map.grown_map[0,1] = 1
+# states = dict()
+# states["stateEstimate.x"] = 0.0
+# states["stateEstimate.y"] = 3.0
 
-        for i in [-1, 0, 1]:
-            for j in [-1, 0, 1]:
-                if (
-                    (i != 0 or j != 0)
-                    and cell[0] + i >= 0
-                    and cell[0] + i < self.grown_map.shape[0]
-                    and cell[1] + j >= 0
-                    and cell[1] + j < self.grown_map.shape[1]
-                ):
-                    cell_neighbors.append((cell[0] + i, cell[1] + j))
-                    distances.append(self.distance((0, 0), (i, j)))
-        return cell_neighbors, distances
+# print(map.cell_from_pos(
+#                 [states["stateEstimate.x"], states["stateEstimate.y"]]))
+
+# map.display_map_using_cv(states)
+# cv2.waitKey(2000)
