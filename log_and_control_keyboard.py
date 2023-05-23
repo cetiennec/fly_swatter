@@ -154,8 +154,6 @@ class LoggingExample:
         self.old_filtered = filtered
         self.old_measurement = new_value
 
-        return filtered
-
 
 if __name__ == '__main__':
     # Initialize the low-level drivers
@@ -221,6 +219,7 @@ if __name__ == '__main__':
         for _ in range(250):
             command = action_from_keyboard()
             cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
+            le.HP_filter(le.states['range.zrange'])
             # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
             map.update_map(le.states)
             start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
