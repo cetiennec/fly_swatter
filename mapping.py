@@ -12,10 +12,12 @@ class Map :
         self.res_pos = 0.15  # meter, must be inferior to size of landing pad
 
         self.size_of_grown_margin = 1  # in number of cells
-        self.use_diagonal_neighbors = True
+        self.use_diagonal_neighbors = False
 
         self.range_max = 1.1  # meter, maximum range of distance sensor
         self.conf = 0.2  # certainty given by each measurement
+
+
 
         self.bare_map = np.zeros(
             (
@@ -31,12 +33,15 @@ class Map :
 
         self.plot_ready = False
 
+        self.x_start_pos = 2.5
+        self.y_start_pos = 1.5
+
 
 #%% Update Map
 
     def update_map(self, sensor_data):
         """Update map from sensor_data, will increase or decrease the certainty value on cells for which the sensors have a measurement"""
-        pos_x, pos_y = [sensor_data["stateEstimate.x"] + 2.5, 1.5 + sensor_data["stateEstimate.y"]]
+        pos_x, pos_y = [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
         yaw = sensor_data["stabilizer.yaw"]
 
         for j in range(4):  # 4 sensors
@@ -189,7 +194,7 @@ class Map :
         # get position
         if sensor_data is not None :
             idx_x, idx_y = self.cell_from_pos(
-                [sensor_data["stateEstimate.x"] + 2.5, 1.5 + sensor_data["stateEstimate.y"]]
+                [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
             )
             self.cell_pos_plot.set_xdata(idx_x)
             self.cell_pos_plot.set_ydata(idx_y)
@@ -222,13 +227,13 @@ class Map :
         map_image = cv2.cvtColor(gray_image.astype('float32'), cv2.COLOR_GRAY2BGR)
         if self.optimal_cell_path is not None:
             for cell in self.optimal_cell_path :
-                cv2.circle(map_image, (upscaling_factor*cell[0],upscaling_factor*cell[1]), int(upscaling_factor*0.7),(0,255,0),-1)
-
+                cv2.circle(map_image, (upscaling_factor*cell[0],upscaling_factor*cell[1]), int(upscaling_factor*0.4),(0,255,0),-1)
+            cv2.circle(map_image, (upscaling_factor*self.optimal_cell_path[-1][0],upscaling_factor*self.optimal_cell_path[-1][1]), int(upscaling_factor*0.5),(0,0,255),-1)
         if sensor_data is not None :
             idx_x, idx_y = self.cell_from_pos(
-                [2.5 + sensor_data["stateEstimate.x"], 1.5 + sensor_data["stateEstimate.y"]]
+                [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
             )
-            cv2.circle(map_image, (upscaling_factor*idx_x, upscaling_factor*idx_y), int(upscaling_factor*0.5),(255,0, 0),-1)
+            cv2.circle(map_image, (upscaling_factor*idx_x, upscaling_factor*idx_y), int(upscaling_factor*0.2),(255,0, 0),-1)
 
         map_image = np.flip(map_image, axis= 0)
         cv2.imshow('Cell map and planned path', map_image)
@@ -314,14 +319,4 @@ class Map :
 
         self.optimal_cell_path.reverse()
 
-# map = Map()
-# map.grown_map[0,1] = 1
-# states = dict()
-# states["stateEstimate.x"] = 0.0
-# states["stateEstimate.y"] = 3.0
 
-# print(map.cell_from_pos(
-#                 [states["stateEstimate.x"], states["stateEstimate.y"]]))
-
-# map.display_map_using_cv(states)
-# cv2.waitKey(2000)
