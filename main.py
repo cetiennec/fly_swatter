@@ -1,30 +1,3 @@
-# -*- coding: utf-8 -*-
-#
-#     ||          ____  _ __
-#  +------+      / __ )(_) /_______________ _____  ___
-#  | 0xBC |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
-#  +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
-#   ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
-#
-#  Copyright (C) 2014 Bitcraze AB
-#
-#  Crazyflie Nano Quadcopter Client
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
-"""
-Simple example that connects to the first Crazyflie found, logs the Stabilizer
-and prints it to the console. After 10s the application disconnects and exits.
-"""
 import logging
 import time
 from threading import Timer
@@ -200,7 +173,8 @@ if __name__ == '__main__':
             if keyboard.is_pressed('o'):  # if key 'o' is pressed
                 # print('You Pressed o!')
                 yaw_rate = 50
-
+            if keyboard.is_pressed('s'):  # if key 's' is pressed
+                return None
             return [forward_velocity, left_velocity, yaw_rate, altitude]
         except:
             return [forward_velocity, left_velocity, yaw_rate, altitude]
@@ -221,36 +195,64 @@ if __name__ == '__main__':
     # The Crazyflie lib doesn't contain anything to keep the application alive,
     # so this is where your application should do something. In our case we
     # are just waiting until we are disconnected.
+
+    etat = 'Taking_off_1'
     while le.is_connected :
         time.sleep(0.01)
 
-        taking_off_drone(cf)
+        if etat == 'Taking_off_1':
+            taking_off_drone(cf)
+            etat = 'Keyboard'
+            # etat = 'Go_landing_zone'
 
-
-        for _ in range(250):
+        if etat == 'Keyboard':
             command = action_from_keyboard()
-            cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
-            le.HP_filter(le.states['range.zrange'])
-            # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
-            map.update_map(le.states)
-            start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
-            map.perform_a_star(start_cell,(10,1))
-            # if len(map.optimal_cell_path) > 1 :
-            #     target_pos = map.pos_from_cell(map.optimal_cell_path[1])
-            #     cf.commander.send_position_setpoint(target_pos[0] - 2.5,
-            #                                         target_pos[1] - 1.5,
-            #                                         0.5,
-            #                                         0)
-            # else :
-            #     break
+            if command == None:
+                etat = 'Landing_2'
+            else:
+                cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
+                le.HP_filter(le.states['range.zrange'])
+                # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
+                map.update_map(le.states)
+                print(le.states['range.front'])
+                start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
+                map.perform_a_star(start_cell,(10,1))
+                # if len(map.optimal_cell_path) > 1 :
+                #     target_pos = map.pos_from_cell(map.optimal_cell_path[1])
+                #     cf.commander.send_position_setpoint(target_pos[0] - 2.5,
+                #                                         target_pos[1] - 1.5,
+                #                                         0.5,
+                #                                         0)
+                # else :
+                #     break
+                map.display_map_using_cv(le.states)
+                
+                time.sleep(0.1)
 
+        if etat == 'Go_landing_zone':
+            etat = 'Search_landing_pad'
 
-            map.display_map_using_cv(le.states)
-            
-            time.sleep(0.1)
+        if etat == 'Search_landing_pad':
+            etat = 'Search_center_pad'
 
-        landing_drone(cf)
+        if etat == 'Search_center_pad':
+            etat = 'Landing_1'
 
-        cf.commander.send_stop_setpoint()
-        break
+        if etat == 'Landing_1':
+            landing_drone(cf)
+            etat = 'Taking_off_1'
+
+        if etat == 'Taking_off_2':
+            etat = 'Go_starting_point'
+
+        if etat == 'Go_starting_point':
+            etat = 'Landing_2'
+
+        if etat == 'Landing_2':
+            landing_drone(cf)
+            etat = 'Finish'
+
+        if etat == 'Finish':
+            cf.commander.send_stop_setpoint()
+            break
 
