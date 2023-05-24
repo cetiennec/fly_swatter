@@ -217,8 +217,6 @@ class Map :
         upscaling_factor = 20
         gray_image = np.transpose(self.grown_map)
         gray_image = (gray_image+1)/2
-        
-
 
         (width, height) = np.shape(gray_image)
 
