@@ -6,18 +6,16 @@ import cv2
 
 class Map :
     def __init__(self):
+
+        # Sensors
+        self.range_max = 1.1  # meter, maximum range of distance sensor
+        self.conf = 0.2  # certainty given by each measurement
+
+        # Map
         self.min_x, self.max_x = 0, 5.0  # meter
         self.min_y, self.max_y = 0, 3.0  # meter
 
         self.res_pos = 0.15  # meter, must be inferior to size of landing pad
-
-        self.size_of_grown_margin = 1  # in number of cells
-        self.use_diagonal_neighbors = False
-
-        self.range_max = 1.1  # meter, maximum range of distance sensor
-        self.conf = 0.2  # certainty given by each measurement
-
-
 
         self.bare_map = np.zeros(
             (
@@ -26,15 +24,25 @@ class Map :
             )
         )  # 0 = unknown, 1 = free, -1 = occupied
 
+        # Map growth 
         self.grown_map = np.zeros_like(self.bare_map)
-
-        self.waypoint = None
+        self.size_of_grown_margin = 1  # in number of cells
+        
+        # A* algorithm
         self.optimal_cell_path = None
+        self.use_diagonal_neighbors = False
 
+        # Plot
         self.plot_ready = False
 
+        # Offsets
         self.x_start_pos = 2.5
         self.y_start_pos = 1.5
+
+        # Waypoint related
+        self.waypoints = []
+        self.current_waypoint = None
+        self.height_map = np.zeros_like(self.bare_map)
 
 
 #%% Update Map
@@ -115,7 +123,7 @@ class Map :
     def merge_sorted_list(self, list1, list2, heuristics1, heuristics2):
         result_list = []
         heuristics = []
-        while len(list1) > 0 and len(list2) > 0:
+        while len(list1) > 0 and len(list2) > 0: 
             if heuristics1[0] > heuristics2[0]:
                 result_list.append(list2.pop(0))
                 heuristics.append(heuristics2.pop(0))
@@ -171,47 +179,47 @@ class Map :
     
 
 #%% Display the map
-    def display_cell_map(self, sensor_data=None):
-        if not self.plot_ready:
-            plt.ion()
-            plt.subplot(131)
-            self.cell_map_plot = plt.imshow(
-                np.transpose(self.grown_map), vmin=-1, vmax=1, cmap="gray", origin="lower"
-            )
-            (self.optimal_cell_path_plot,) = plt.plot(0, 0, "go")
-            (self.cell_pos_plot,) = plt.plot(0, 0, "r+")
-            (self.waypoint_plot,) = plt.plot(0, 0, "bx")
+    # def display_cell_map(self, sensor_data=None):
+    #     if not self.plot_ready:
+    #         plt.ion()
+    #         plt.subplot(131)
+    #         self.cell_map_plot = plt.imshow(
+    #             np.transpose(self.grown_map), vmin=-1, vmax=1, cmap="gray", origin="lower"
+    #         )
+    #         (self.optimal_cell_path_plot,) = plt.plot(0, 0, "go")
+    #         (self.cell_pos_plot,) = plt.plot(0, 0, "r+")
+    #         (self.waypoint_plot,) = plt.plot(0, 0, "bx")
 
-            plt.title("Cell map and planned path")
-            plt.xlabel("cX")
-            plt.ylabel("cY")
+    #         plt.title("Cell map and planned path")
+    #         plt.xlabel("cX")
+    #         plt.ylabel("cY")
 
-            self.plot_ready = True
+    #         self.plot_ready = True
 
-        # update map data and flip the map , so it appears with the same coordinate system as simulation
-        self.cell_map_plot.set_data(np.transpose(self.grown_map))
+    #     # update map data and flip the map , so it appears with the same coordinate system as simulation
+    #     self.cell_map_plot.set_data(np.transpose(self.grown_map))
 
-        # get position
-        if sensor_data is not None :
-            idx_x, idx_y = self.cell_from_pos(
-                [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
-            )
-            self.cell_pos_plot.set_xdata(idx_x)
-            self.cell_pos_plot.set_ydata(idx_y)
+    #     # get position
+    #     if sensor_data is not None :
+    #         idx_x, idx_y = self.cell_from_pos(
+    #             [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
+    #         )
+    #         self.cell_pos_plot.set_xdata(idx_x)
+    #         self.cell_pos_plot.set_ydata(idx_y)
 
-        if self.waypoint is not None:
-            self.waypoint_plot.set_xdata(self.waypoint[0])
-            self.waypoint_plot.set_ydata(self.waypoint[1])
+    #     if self.waypoint is not None:
+    #         self.waypoint_plot.set_xdata(self.waypoint[0])
+    #         self.waypoint_plot.set_ydata(self.waypoint[1])
 
-        if self.optimal_cell_path is not None:
-            self.optimal_cell_path_plot.set_xdata(
-                [cell[0] for cell in self.optimal_cell_path]
-            )
-            self.optimal_cell_path_plot.set_ydata(
-                [cell[1] for cell in self.optimal_cell_path]
-            )
+    #     if self.optimal_cell_path is not None:
+    #         self.optimal_cell_path_plot.set_xdata(
+    #             [cell[0] for cell in self.optimal_cell_path]
+    #         )
+    #         self.optimal_cell_path_plot.set_ydata(
+    #             [cell[1] for cell in self.optimal_cell_path]
+    #         )
 
-        plt.pause(0.001)
+    #     plt.pause(0.001)
 
     def display_map_using_cv(self, sensor_data = None):
         upscaling_factor = 20
@@ -232,6 +240,12 @@ class Map :
                 [sensor_data["stateEstimate.x"],  sensor_data["stateEstimate.y"]]
             )
             cv2.circle(map_image, (upscaling_factor*idx_x, upscaling_factor*idx_y), int(upscaling_factor*0.2),(255,0, 0),-1)
+
+        index = 0
+        for waypoint in self.waypoints :
+            color = (0.2, 7.0*index/255, 0.2)
+            cv2.rectangle(map_image, (upscaling_factor*waypoint[0] - 2, upscaling_factor*waypoint[1] - 2), (upscaling_factor*waypoint[0] + 2, upscaling_factor*waypoint[1] + 2), color,-1)
+            index +=1
 
         map_image = np.flip(map_image, axis= 0)
         cv2.imshow('Cell map and planned path', map_image)
@@ -316,5 +330,53 @@ class Map :
             self.optimal_cell_path.append(current)
 
         self.optimal_cell_path.reverse()
+
+
+#%% Everything related to the waypoints
+
+    def create_waypoints(self, start_from_left = True):
+        nX = int(1.5 / self.res_pos) # height of the landing zone
+        offsetX = int(3.5 / self.res_pos) # where the landing zone starts from
+        nY = int((self.max_y - self.min_y) / self.res_pos)
+
+        if start_from_left :
+            direction = 1
+        else : 
+            direction = -1
+
+        self.waypoints = []
+        for idx_x in range(1, nX - 1, 2):
+            if direction == 1:
+                for idx_y in range(1, nY , 2):
+                    self.waypoints.append((idx_y, offsetX + idx_x))
+            else:
+                for idx_y in range(nY - 1, 0, -2):
+                    self.waypoints.append(
+                        (
+                            idx_y,
+                            offsetX + idx_x,
+                        )
+                    )
+            direction = -direction
+    
+    def get_next_waypoint(self):
+        if len(self.waypoints) == 0 :
+            self.create_waypoints()
+        self.waypoint = self.waypoints.pop(0)
+
+        while self.grown_map[self.waypoint] < 0 and self.height_map[self.waypoint] > 0 and len(self.waypoints) > 1: #checks if waypoint does not hold an obstacle and has not already been visited
+            self.waypoint = self.waypoints.pop(0)
+        
+        return self.waypoint
+
+    def update_height_map(self, sensor_data, is_on_step) :
+        cell = self.cell_from_pos([sensor_data["stateEstimate.x"],  sensor_data["stateEstimate.y"]])
+        if is_on_step :
+            self.height_map[cell] = 1
+    
+    
+            
+    
+
 
 
