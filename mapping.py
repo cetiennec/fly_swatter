@@ -103,13 +103,13 @@ class Map :
 
     def pos_from_cell(self, cell):
         return (
-            cell[1] * self.res_pos + self.min_x,
-            self.max_y - cell[0] * self.res_pos,
+            cell[1] * self.res_pos + self.min_x - self.x_start_pos,
+            self.max_y - cell[0] * self.res_pos - self.y_start_pos,
         )
 
     def cell_from_pos(self, position):
-        idx_x = int(np.round((self.max_y - position[1]) / self.res_pos, 0))
-        idx_y = int(np.round((position[0] - self.min_x) / self.res_pos, 0))
+        idx_x = int(np.round((self.max_y - position[1] - self.y_start_pos) / self.res_pos, 0))
+        idx_y = int(np.round((position[0] - self.min_x + self.x_start_pos) / self.res_pos, 0))
         return (idx_x, idx_y)
     
     def merge_sorted_list(self, list1, list2, heuristics1, heuristics2):
@@ -229,7 +229,7 @@ class Map :
             cv2.circle(map_image, (upscaling_factor*self.optimal_cell_path[-1][0],upscaling_factor*self.optimal_cell_path[-1][1]), int(upscaling_factor*0.5),(0,0,255),-1)
         if sensor_data is not None :
             idx_x, idx_y = self.cell_from_pos(
-                [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
+                [sensor_data["stateEstimate.x"],  sensor_data["stateEstimate.y"]]
             )
             cv2.circle(map_image, (upscaling_factor*idx_x, upscaling_factor*idx_y), int(upscaling_factor*0.2),(255,0, 0),-1)
 
