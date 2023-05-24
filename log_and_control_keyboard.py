@@ -45,7 +45,7 @@ uri = uri_helper.uri_from_env(default='radio://0/70/2M/E7E7E7E707')
 logging.basicConfig(level=logging.ERROR)
 
 
-class LoggingExample:
+class Logger:
     """
     Simple logging example class that logs the Stabilizer from a supplied
     link uri and disconnects after 5s.
@@ -207,7 +207,7 @@ if __name__ == '__main__':
 
     cflib.crtp.init_drivers()
 
-    le = LoggingExample(uri)
+    le = Logger(uri)
     cf = le._cf
 
     cf.param.set_value('kalman.resetEstimation', '1')
