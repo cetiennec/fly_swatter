@@ -159,8 +159,22 @@ class LoggingExample:
 if __name__ == '__main__':
     # Initialize the low-level drivers
     # Tools
+    def landing_drone(cf):
+        for _ in range(20):
+            cf.commander.send_hover_setpoint(0, 0, 0, 0.4)
+            time.sleep(0.1)
+        for y in range(10):
+            cf.commander.send_hover_setpoint(0, 0, 0, (10-y)/ 25)
+            time.sleep(0.1)
 
 
+    def taking_off_drone(cf):
+        for y in range(10):
+            cf.commander.send_hover_setpoint(0, 0, 0, y / 25)
+            time.sleep(0.1)
+        for _ in range(20):
+            cf.commander.send_hover_setpoint(0, 0, 0, 0.4)
+            time.sleep(0.1)
     def action_from_keyboard():
         forward_velocity = 0.0
         left_velocity = 0.0
@@ -207,15 +221,11 @@ if __name__ == '__main__':
     # The Crazyflie lib doesn't contain anything to keep the application alive,
     # so this is where your application should do something. In our case we
     # are just waiting until we are disconnected.
-    while le.is_connected:
+    while le.is_connected :
         time.sleep(0.01)
-        for y in range(10):
-            cf.commander.send_hover_setpoint(0, 0, 0, y / 25)
-            time.sleep(0.1)
 
-        for _ in range(20):
-            cf.commander.send_hover_setpoint(0, 0, 0, 0.4)
-            time.sleep(0.1)
+        taking_off_drone(cf)
+
 
         for _ in range(250):
             command = action_from_keyboard()
@@ -239,13 +249,7 @@ if __name__ == '__main__':
             
             time.sleep(0.1)
 
-        for _ in range(20):
-            cf.commander.send_hover_setpoint(0, 0, 0, 0.4)
-            time.sleep(0.1)
-
-        for y in range(10):
-            cf.commander.send_hover_setpoint(0, 0, 0, (10-y)/ 25)
-            time.sleep(0.1)
+        landing_drone(cf)
 
         cf.commander.send_stop_setpoint()
         break
