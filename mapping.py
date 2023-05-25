@@ -375,7 +375,35 @@ class Map :
         if is_on_step :
             self.height_map[cell] = 1
     
+    def simplify_path(self):
+        # return the farest point to be reached
+        if len(self.optimal_cell_path) > 2:
+            target_pos = self.pos_from_cell(self.optimal_cell_path[1])
+            i=1
+            next_target_pos = self.pos_from_cell(self.optimal_cell_path[1+i])
 
+            while target_pos[0]==next_target_pos[0] and (len(self.optimal_cell_path)>i+2):
+                i+=1
+                next_target_pos = self.pos_from_cell(self.optimal_cell_path[1 + i])
+            j=1
+            next_target_pos = self.pos_from_cell(self.optimal_cell_path[1+j])
+
+            while target_pos[1] == next_target_pos[1] and (len(self.optimal_cell_path)>2+j):
+                j += 1
+                next_target_pos = self.pos_from_cell(self.optimal_cell_path[1 + j])
+
+            if i>1:
+                return self.pos_from_cell(self.optimal_cell_path[i])
+            if j>1:
+                return self.pos_from_cell(self.optimal_cell_path[j])
+            else :
+                return target_pos
+
+        elif len(self.optimal_cell_path) == 2:
+            return self.pos_from_cell(self.optimal_cell_path[1])
+
+        elif len(self.optimal_cell_path) == 1:
+            return self.pos_from_cell(self.optimal_cell_path[0])
             
     
 
