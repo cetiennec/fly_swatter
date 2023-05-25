@@ -49,7 +49,7 @@ class Map :
 
     def update_map(self, sensor_data):
         """Update map from sensor_data, will increase or decrease the certainty value on cells for which the sensors have a measurement"""
-        pos_x, pos_y = [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
+        pos_x, pos_y = [sensor_data["stateEstimate.x"], sensor_data["stateEstimate.y"]]
         yaw = sensor_data["stabilizer.yaw"]
 
         for j in range(4):  # 4 sensors
