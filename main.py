@@ -119,14 +119,17 @@ class Logger:
         self.is_connected = False
 
     def HP_filter(self,new_value):
-        filtered = 0.01*self.old_filtered + 0.01*(new_value-self.old_measurement )
-
-        if filtered-self.old_filtered>=0.6 and self.old_measurement !=0:
+        filtered = 0.1*self.old_filtered + 0.1*(new_value-self.old_measurement )
+        print("VALUE OF STEP",abs(new_value-self.old_measurement ))
+        if new_value-self.old_measurement >=20 and self.old_measurement !=0:
             print('FOUND LANDING PAD UPP')
-        elif filtered - self.old_filtered <= -0.7 and self.old_measurement !=0:
+            return True
+        elif new_value-self.old_measurement  <= -20 and self.old_measurement !=0:
             print('FOUND LANDING PAD DOWN')
+            return True
         self.old_filtered = filtered
         self.old_measurement = new_value
+        return False
 
 
 if __name__ == '__main__':
@@ -202,38 +205,57 @@ if __name__ == '__main__':
 
         if etat == 'Taking_off_1':
             taking_off_drone(cf)
-            etat = 'Keyboard'
+            etat = 'Go_landing_zone'
             # etat = 'Go_landing_zone'
 
         if etat == 'Keyboard':
             command = action_from_keyboard()
+            cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
             if command == None:
                 etat = 'Landing_2'
-            else:
-                cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
-                le.HP_filter(le.states['range.zrange'])
-                # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
-                map.update_map(le.states)
-                print(le.states['range.front'])
-                start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
-                map.perform_a_star(start_cell,(10,1))
-                # if len(map.optimal_cell_path) > 1 :
-                #     target_pos = map.pos_from_cell(map.optimal_cell_path[1])
-                #     cf.commander.send_position_setpoint(target_pos[0] - 2.5,
-                #                                         target_pos[1] - 1.5,
-                #                                         0.5,
-                #                                         0)
-                # else :
-                #     break
-                map.display_map_using_cv(le.states)
-                
-                time.sleep(0.1)
+            map.update_map(le.states)
+            map.display_map_using_cv(le.states)
 
         if etat == 'Go_landing_zone':
-            etat = 'Search_landing_pad'
+            command = action_from_keyboard()
+            if command == None:
+                etat = 'Landing_2'
+            le.HP_filter(le.states['range.zrange'])
+            # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
+            map.update_map(le.states)
+            start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
+            # start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
+            map.perform_a_star(start_cell, (10, 23))
+            if len(map.optimal_cell_path) > 1:
+                target_pos = map.simplify_path()
+                cf.commander.send_position_setpoint(target_pos[0] ,
+                                                    target_pos[1] ,
+                                                    0.4,
+                                                    0)
+                map.display_map_using_cv(le.states)
+            else:
+                etat = 'Search_landing_pad'
+            time.sleep(0.1)
 
         if etat == 'Search_landing_pad':
-            etat = 'Search_center_pad'
+            command = action_from_keyboard()
+            if command == None:
+                etat = 'Landing_2'
+            is_on_step = le.HP_filter(le.states['range.zrange'])
+            map.update_map(le.states)
+            map.update_height_map(le.states,is_on_step)
+            map.display_map_using_cv(le.states)
+            target_pos = map.pos_from_cell(map.get_next_waypoint())
+            print('waypoints',target_pos)
+            cf.commander.send_position_setpoint(target_pos[0] ,
+                                                target_pos[1] ,
+                                                0.4,
+                                                0)
+            if is_on_step :
+                etat = 'Landing_2'
+            else:
+                time.sleep(0.5)
+            #etat = 'Search_center_pad'
 
         if etat == 'Search_center_pad':
             etat = 'Landing_1'
@@ -246,8 +268,26 @@ if __name__ == '__main__':
             etat = 'Go_starting_point'
 
         if etat == 'Go_starting_point':
-            etat = 'Landing_2'
-
+            command = action_from_keyboard()
+            if command == None:
+                etat = 'Landing_2'
+            le.HP_filter(le.states['range.zrange'])
+            # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
+            map.update_map(le.states)
+            start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
+            # start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
+            map.perform_a_star(start_cell, (0, 0))
+            if len(map.optimal_cell_path) > 1:
+                target_pos = map.simplify_path()
+                cf.commander.send_position_setpoint(target_pos[0] ,
+                                                    target_pos[1] ,
+                                                    0.4,
+                                                    0)
+                map.display_map_using_cv(le.states)
+            else:
+                etat = 'Landing_2'
+            time.sleep(0.1)
+          
         if etat == 'Landing_2':
             landing_drone(cf)
             etat = 'Finish'

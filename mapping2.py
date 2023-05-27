@@ -36,7 +36,7 @@ class Map :
         self.plot_ready = False
 
         # Offsets
-        self.x_start_pos = 3
+        self.x_start_pos = 2.5
         self.y_start_pos = 1.5
 
         # Waypoint related
@@ -49,7 +49,7 @@ class Map :
 
     def update_map(self, sensor_data):
         """Update map from sensor_data, will increase or decrease the certainty value on cells for which the sensors have a measurement"""
-        pos_x, pos_y = [sensor_data["stateEstimate.x"], sensor_data["stateEstimate.y"]]
+        pos_x, pos_y = [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
         yaw = sensor_data["stabilizer.yaw"]
 
         for j in range(4):  # 4 sensors
@@ -243,7 +243,7 @@ class Map :
 
         index = 0
         for waypoint in self.waypoints :
-            color = (1, 7.0*index/255, 0.2)
+            color = (0.2, 7.0*index/255, 0.2)
             cv2.rectangle(map_image, (upscaling_factor*waypoint[0] - 2, upscaling_factor*waypoint[1] - 2), (upscaling_factor*waypoint[0] + 2, upscaling_factor*waypoint[1] + 2), color,-1)
             index +=1
 
@@ -340,9 +340,9 @@ class Map :
         nY = int((self.max_y - self.min_y) / self.res_pos)
 
         if start_from_left :
-            direction = -1
-        else : 
             direction = 1
+        else : 
+            direction = -1
 
         self.waypoints = []
         for idx_x in range(1, nX - 1, 2):
@@ -364,9 +364,8 @@ class Map :
             self.create_waypoints()
         self.waypoint = self.waypoints.pop(0)
 
-        while (self.grown_map[self.waypoint] < 0 or self.height_map[self.waypoint] > 0) and len(self.waypoints) > 1: #checks if waypoint does not hold an obstacle and has not already been visited
+        while self.grown_map[self.waypoint] < 0 and self.height_map[self.waypoint] > 0 and len(self.waypoints) > 1: #checks if waypoint does not hold an obstacle and has not already been visited
             self.waypoint = self.waypoints.pop(0)
-            print(self.waypoint)
         
         return self.waypoint
 
@@ -374,7 +373,8 @@ class Map :
         cell = self.cell_from_pos([sensor_data["stateEstimate.x"],  sensor_data["stateEstimate.y"]])
         if is_on_step :
             self.height_map[cell] = 1
-    
+
+
     def simplify_path(self):
         # return the farest point to be reached
         if len(self.optimal_cell_path) > 2:
@@ -404,6 +404,9 @@ class Map :
 
         elif len(self.optimal_cell_path) == 1:
             return self.pos_from_cell(self.optimal_cell_path[0])
+
+    
+    
             
     
 
