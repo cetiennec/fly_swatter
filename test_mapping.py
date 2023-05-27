@@ -13,9 +13,10 @@ map.create_waypoints(False)
 waypoint = map.get_next_waypoint()
 print("Next waypoint : " + str(waypoint))
 
+original_target = map.cell_from_pos((3.5 - map.x_start_pos, 1.5 - map.y_start_pos))
 
 map.perform_a_star(map.cell_from_pos(
-                [states["stateEstimate.x"], states["stateEstimate.y"]]), waypoint)
+                [states["stateEstimate.x"], states["stateEstimate.y"]]), original_target)
 
 
 print("Print pos in cell format : " + str(map.cell_from_pos(

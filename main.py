@@ -142,6 +142,9 @@ if __name__ == '__main__':
         for y in range(10):
             cf.commander.send_hover_setpoint(0, 0, 0, (10-y)/ 25)
             time.sleep(0.1)
+        for _ in range(10):
+            cf.commander.send_hover_setpoint(0, 0, 0, 0)
+            time.sleep(0.1)
 
 
     def taking_off_drone(cf):
@@ -151,6 +154,7 @@ if __name__ == '__main__':
         for _ in range(20):
             cf.commander.send_hover_setpoint(0, 0, 0, 0.4)
             time.sleep(0.1)
+
     def action_from_keyboard():
         forward_velocity = 0.0
         left_velocity = 0.0
@@ -201,98 +205,134 @@ if __name__ == '__main__':
 
     etat = 'Taking_off_1'
     while le.is_connected :
-        time.sleep(0.01)
+        try :
+            time.sleep(0.01)
 
-        if etat == 'Taking_off_1':
-            taking_off_drone(cf)
-            etat = 'Go_landing_zone'
-            # etat = 'Go_landing_zone'
+            if etat == 'Taking_off_1':
+                taking_off_drone(cf)
+                etat = 'Go_landing_zone'
+                cf.commander.send_position_setpoint(0,0,0.4, 0)
+                # etat = 'Go_landing_zone'
 
-        if etat == 'Keyboard':
-            command = action_from_keyboard()
-            cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
-            if command == None:
-                etat = 'Landing_2'
-            map.update_map(le.states)
-            map.display_map_using_cv(le.states)
-
-        if etat == 'Go_landing_zone':
-            command = action_from_keyboard()
-            if command == None:
-                etat = 'Landing_2'
-            le.HP_filter(le.states['range.zrange'])
-            # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
-            map.update_map(le.states)
-            start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
-            # start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
-            map.perform_a_star(start_cell, (10, 23))
-            if len(map.optimal_cell_path) > 1:
-                target_pos = map.simplify_path()
-                cf.commander.send_position_setpoint(target_pos[0] ,
-                                                    target_pos[1] ,
-                                                    0.4,
-                                                    0)
+            if etat == 'Keyboard':
+                command = action_from_keyboard()
+                cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
+                if command == None:
+                    etat = 'Landing_final'
+                map.update_map(le.states)
                 map.display_map_using_cv(le.states)
-            else:
-                etat = 'Search_landing_pad'
-            time.sleep(0.1)
 
-        if etat == 'Search_landing_pad':
-            command = action_from_keyboard()
-            if command == None:
-                etat = 'Landing_2'
-            is_on_step = le.HP_filter(le.states['range.zrange'])
-            map.update_map(le.states)
-            map.update_height_map(le.states,is_on_step)
+            if etat == 'Go_landing_zone':
+                command = action_from_keyboard()
+                if command == None:
+                    etat = 'Landing_final'
+                le.HP_filter(le.states['range.zrange'])
+                # cf.commander.send_hover_setpoint(0, 0, 0, 0.4)
+                map.update_map(le.states)
+                start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
+                # start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
+                original_target = map.cell_from_pos((3.5 - map.x_start_pos, 1.5 - map.y_start_pos))
+                if map.grown_map[original_target] < 0:
+                    etat = 'Search_landing_pad'
+                map.perform_a_star(start_cell, original_target)
+                if len(map.optimal_cell_path) > 1:
+                    target_pos = map.simplify_path()
+                    cf.commander.send_position_setpoint(target_pos[0] ,
+                                                        target_pos[1] ,
+                                                        0.4,
+                                                        0)
+                else:
+                    etat = 'Search_landing_pad' 
+                    print(etat)
+                time.sleep(0.05)
+
+            if etat == 'Search_landing_pad':
+                # manual override
+                command = action_from_keyboard()
+                if command == None:
+                    etat = 'Landing_final'
+
+                # updating
+                is_on_step = le.HP_filter(le.states['range.zrange'])
+                map.update_map(le.states)
+                map.update_height_map(le.states,is_on_step)
+                
+                start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
+
+                map.perform_a_star(start_cell, map.get_current_waypoint())
+
+                if len(map.optimal_cell_path) > 1:
+
+                    target_pos = map.simplify_path()
+                    cf.commander.send_position_setpoint(target_pos[0] ,
+                                                        target_pos[1] ,
+                                                        0.4,
+                                                        0)
+                elif len(map.optimal_cell_path) == 1 : 
+
+                    map.perform_a_star(start_cell, map.get_next_waypoint())
+                    target_pos = map.simplify_path()
+                    cf.commander.send_position_setpoint(target_pos[0] ,
+                                                        target_pos[1] ,
+                                                        0.4,
+                                                        0)
+
+                if is_on_step :
+                    etat = 'Landing_1'
+                else:
+                    time.sleep(0.05)
+                #etat = 'Search_center_pad'
+
+            if etat == 'Search_center_pad':
+                etat = 'Landing_1'
+
+            if etat == 'Landing_1':
+                landing_drone(cf)
+                etat = 'Taking_off_2'
+
+            if etat == 'Taking_off_2':
+                taking_off_drone(cf)
+                etat = 'Go_starting_point'
+
+            if etat == 'Go_starting_point':
+                #manual override
+                command = action_from_keyboard()
+                if command == None:
+                    etat = 'Landing_final'
+                
+                map.update_map(le.states)
+                start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
+                end_cell = map.cell_from_pos([0,0])
+                map.perform_a_star(start_cell, end_cell)
+                if len(map.optimal_cell_path) > 1:
+                    target_pos = map.simplify_path()
+                    cf.commander.send_position_setpoint(target_pos[0] ,
+                                                        target_pos[1] ,
+                                                        0.4,
+                                                        0)
+                else:
+                    cf.commander.send_position_setpoint(0.0 ,
+                                                        0.0 ,
+                                                        0.4,
+                                                        0)
+                    etat = 'Landing_final'
+                    #need to refind the grid 
+                    time.sleep(0.3)
+                time.sleep(0.1)
+            
+            if etat == 'Landing_final':
+                landing_drone(cf)
+                etat = 'Finish'
+
+            if etat == 'Finish':
+                cf.commander.send_stop_setpoint()
+                le.is_connected = False
+                break
+
             map.display_map_using_cv(le.states)
-            target_pos = map.pos_from_cell(map.get_next_waypoint())
-            print('waypoints',target_pos)
-            cf.commander.send_position_setpoint(target_pos[0] ,
-                                                target_pos[1] ,
-                                                0.4,
-                                                0)
-            if is_on_step :
-                etat = 'Landing_2'
-            else:
-                time.sleep(0.5)
-            #etat = 'Search_center_pad'
-
-        if etat == 'Search_center_pad':
-            etat = 'Landing_1'
-
-        if etat == 'Landing_1':
-            landing_drone(cf)
-            etat = 'Taking_off_1'
-
-        if etat == 'Taking_off_2':
-            etat = 'Go_starting_point'
-
-        if etat == 'Go_starting_point':
-            command = action_from_keyboard()
-            if command == None:
-                etat = 'Landing_2'
-            le.HP_filter(le.states['range.zrange'])
-            # cf.commander.send_hover_setpoint(0, 0, 10, 0.4)
-            map.update_map(le.states)
-            start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
-            # start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
-            map.perform_a_star(start_cell, (0, 0))
-            if len(map.optimal_cell_path) > 1:
-                target_pos = map.simplify_path()
-                cf.commander.send_position_setpoint(target_pos[0] ,
-                                                    target_pos[1] ,
-                                                    0.4,
-                                                    0)
-                map.display_map_using_cv(le.states)
-            else:
-                etat = 'Landing_2'
-            time.sleep(0.1)
-          
-        if etat == 'Landing_2':
+        except Exception as e: 
             landing_drone(cf)
             etat = 'Finish'
-
-        if etat == 'Finish':
-            cf.commander.send_stop_setpoint()
-            break
+            le.is_connected = False
+            print(e)
 

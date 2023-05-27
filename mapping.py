@@ -9,13 +9,13 @@ class Map :
 
         # Sensors
         self.range_max = 1.1  # meter, maximum range of distance sensor
-        self.conf = 0.2  # certainty given by each measurement
+        self.conf = 0.1  # certainty given by each measurement
 
         # Map
         self.min_x, self.max_x = 0, 5.0  # meter
         self.min_y, self.max_y = 0, 3.0  # meter
 
-        self.res_pos = 0.15  # meter, must be inferior to size of landing pad
+        self.res_pos = 0.10  # meter, must be inferior to size of landing pad
 
         self.bare_map = np.zeros(
             (
@@ -26,7 +26,7 @@ class Map :
 
         # Map growth 
         self.grown_map = np.zeros_like(self.bare_map)
-        self.size_of_grown_margin = 1  # in number of cells
+        self.size_of_grown_margin = 2  # in number of cells
         
         # A* algorithm
         self.optimal_cell_path = None
@@ -36,7 +36,7 @@ class Map :
         self.plot_ready = False
 
         # Offsets
-        self.x_start_pos = 3
+        self.x_start_pos = 0.3
         self.y_start_pos = 1.5
 
         # Waypoint related
@@ -63,7 +63,7 @@ class Map :
             elif j == 3:
                 measurement = sensor_data["range.right"]
 
-            measurement = measurement / 1000 #to convert it back to meters
+            measurement = measurement / 1100 # to convert it back to meters
             for i in range(int(self.range_max / self.res_pos)):  # range is 2 meters
                 dist = i * self.res_pos
                 idx_x, idx_y = self.cell_from_pos(
@@ -87,7 +87,7 @@ class Map :
                 if dist < measurement:
                     self.bare_map[idx_x, idx_y] += self.conf
                 else:
-                    self.bare_map[idx_x, idx_y] -= self.conf
+                    self.bare_map[idx_x, idx_y] -= 3 * self.conf
                     break
 
         # roll the bare measurement map, as to enforce safety margin around the obstacles
@@ -344,13 +344,14 @@ class Map :
         else : 
             direction = 1
 
+        self.search_step = 4
         self.waypoints = []
-        for idx_x in range(1, nX - 1, 2):
+        for idx_x in range(1, nX - 1, self.search_step):
             if direction == 1:
-                for idx_y in range(1, nY , 2):
+                for idx_y in range(1, nY , self.search_step):
                     self.waypoints.append((idx_y, offsetX + idx_x))
             else:
-                for idx_y in range(nY - 1, 0, -2):
+                for idx_y in range(nY - 1, 0, -self.search_step):
                     self.waypoints.append(
                         (
                             idx_y,
@@ -358,17 +359,28 @@ class Map :
                         )
                     )
             direction = -direction
+        self.get_next_waypoint()
     
     def get_next_waypoint(self):
-        if len(self.waypoints) == 0 :
+        if len(self.waypoints) < 1:
             self.create_waypoints()
-        self.waypoint = self.waypoints.pop(0)
 
-        while (self.grown_map[self.waypoint] < 0 or self.height_map[self.waypoint] > 0) and len(self.waypoints) > 1: #checks if waypoint does not hold an obstacle and has not already been visited
-            self.waypoint = self.waypoints.pop(0)
-            print(self.waypoint)
-        
-        return self.waypoint
+        self.current_waypoint = self.waypoints[0]
+        self.waypoints.pop(0)
+
+        while (self.grown_map[self.current_waypoint] < 0 or self.height_map[self.current_waypoint] > 0) and len(self.waypoints) > 1: #checks if waypoint does not hold an obstacle and has not already been visited
+            self.current_waypoint = self.waypoints[0]
+            self.waypoints.pop(0)
+
+        return self.current_waypoint
+    
+    def get_current_waypoint(self):
+        if self.current_waypoint is None :
+            self.create_waypoints()
+
+        if self.grown_map[self.current_waypoint] < 0 : # waypoint is occupied
+            self.get_next_waypoint()
+        return self.current_waypoint
 
     def update_height_map(self, sensor_data, is_on_step) :
         cell = self.cell_from_pos([sensor_data["stateEstimate.x"],  sensor_data["stateEstimate.y"]])
@@ -382,13 +394,13 @@ class Map :
             i=1
             next_target_pos = self.pos_from_cell(self.optimal_cell_path[1+i])
 
-            while target_pos[0]==next_target_pos[0] and (len(self.optimal_cell_path)>i+2):
+            while target_pos[0]==next_target_pos[0] and (len(self.optimal_cell_path)>i+2 and i < 3):
                 i+=1
                 next_target_pos = self.pos_from_cell(self.optimal_cell_path[1 + i])
             j=1
             next_target_pos = self.pos_from_cell(self.optimal_cell_path[1+j])
 
-            while target_pos[1] == next_target_pos[1] and (len(self.optimal_cell_path)>2+j):
+            while target_pos[1] == next_target_pos[1] and (len(self.optimal_cell_path)>2+j and j < 3):
                 j += 1
                 next_target_pos = self.pos_from_cell(self.optimal_cell_path[1 + j])
 
