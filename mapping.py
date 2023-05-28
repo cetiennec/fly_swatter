@@ -50,7 +50,6 @@ class Map :
     def update_map(self, sensor_data):
         """Update map from sensor_data, will increase or decrease the certainty value on cells for which the sensors have a measurement"""
         pos_x, pos_y = [sensor_data["stateEstimate.x"], sensor_data["stateEstimate.y"]]
-        yaw = sensor_data["stabilizer.yaw"]
 
         for j in range(4):  # 4 sensors
             yaw_sensor = j * np.pi / 2  # yaw positive is counter clockwise
@@ -221,7 +220,7 @@ class Map :
 
     #     plt.pause(0.001)
 
-    def display_map_using_cv(self, sensor_data = None):
+    def display_map_using_cv(self, sensor_data = None, state = 'Unknown state'):
         upscaling_factor = 20
         gray_image = np.transpose(self.grown_map)
         gray_image = (gray_image+1)/2
@@ -247,7 +246,9 @@ class Map :
             cv2.rectangle(map_image, (upscaling_factor*waypoint[0] - 2, upscaling_factor*waypoint[1] - 2), (upscaling_factor*waypoint[0] + 2, upscaling_factor*waypoint[1] + 2), color,-1)
             index +=1
 
-        map_image = np.flip(map_image, axis= 0)
+        map_image = np.flip(map_image, axis= 0).astype(float)
+
+        map_image = cv2.putText(map_image, "State : " + state, (10,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color=(0,0.9,1))
         cv2.imshow('Cell map and planned path', map_image)
         cv2.waitKey(1)
     
@@ -261,6 +262,11 @@ class Map :
         self.grown_map_astar[self.grown_map < 0] = -1  # to keep convention
 
         cameFrom = np.zeros(self.grown_map_astar.shape, dtype=tuple)
+
+        for i in range(len(cameFrom)):
+            for j in range(len(cameFrom[i])):
+                cameFrom[i,j] = start_cell
+
 
         cells_to_explore = [start_cell]
         heuristics = [0]
@@ -325,9 +331,12 @@ class Map :
         # now find best path
         current = target_cell
         self.optimal_cell_path = [current]
+
         while current != cameFrom[current]:
             current = cameFrom[current]
             self.optimal_cell_path.append(current)
+            # print("current", current)
+            # print("cameFrom", cameFrom[current])
 
         self.optimal_cell_path.reverse()
 
@@ -346,12 +355,12 @@ class Map :
 
         self.search_step = 4
         self.waypoints = []
-        for idx_x in range(1, nX - 1, self.search_step):
+        for idx_x in range(1, nX - 1, 3):
             if direction == 1:
-                for idx_y in range(1, nY , self.search_step):
+                for idx_y in range(2, nY -1 , self.search_step):
                     self.waypoints.append((idx_y, offsetX + idx_x))
             else:
-                for idx_y in range(nY - 1, 0, -self.search_step):
+                for idx_y in range(nY - 2, 1, -self.search_step):
                     self.waypoints.append(
                         (
                             idx_y,
@@ -359,6 +368,15 @@ class Map :
                         )
                     )
             direction = -direction
+        self.get_next_waypoint()
+
+    def create_final_waypoints(self):
+        self.waypoints = []
+        start_cell = self.cell_from_pos([0.0, 0.0])
+        for i in [0,-1,1] :
+            for j in [0,-1, 1] :
+                self.waypoints.append((start_cell[0] + i, start_cell[1] + j))
+
         self.get_next_waypoint()
     
     def get_next_waypoint(self):

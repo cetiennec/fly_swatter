@@ -192,7 +192,7 @@ class Logger:
 
 
         # print("VALUE OF STEP",new_value)
-        if z_hist[-2] - z_hist[-1] < - 25 and not(self.is_on_obstacle):
+        if z_hist[-2] - z_hist[-1] < - 13 and not(self.is_on_obstacle):
             print('FOUND LANDING PAD UP')
             self.is_on_obstacle = True
             self.last_time_up = self.states['t']
@@ -200,7 +200,7 @@ class Logger:
             # print("variance", np.std(z_hist))
 
 
-        elif z_hist[-2] - z_hist[-1] > + 25 and self.is_on_obstacle :
+        elif z_hist[-2] - z_hist[-1] > + 13 and self.is_on_obstacle :
             print('FOUND LANDING PAD DOWN')
             self.is_on_obstacle = False
             self.last_time_down = self.states['t']
@@ -355,13 +355,13 @@ if __name__ == '__main__':
                 
                 le.send_hover_setpoint(command[0], command[1], command[2], le.desired_height)
 
-                if le.is_on_obstacle :
-                    print("Found landing pad !")
-                    find_center_lp2(le, cf)
-                    landing_drone(cf)
-                    cf.commander.send_stop_setpoint()
-                    le.is_connected = False
-                    break
+                # if le.is_on_obstacle :
+                #     print("Found landing pad !")
+                #     find_center_lp2(le, cf)
+                #     landing_drone(cf)
+                #     cf.commander.send_stop_setpoint()
+                #     le.is_connected = False
+                #     break
 
                 time.sleep(0.1)
             
