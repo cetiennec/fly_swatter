@@ -70,6 +70,8 @@ class Logger:
 
         self.emergency_stop = False
 
+
+
     def _connected(self, link_uri):
         """ This callback is called form the Crazyflie API when a Crazyflie
         has been connected and the TOCs have been downloaded."""
@@ -107,7 +109,7 @@ class Logger:
             print('Could not add Stabilizer log config, bad configuration.')
 
         # Start a timer to disconnect in 10s
-        t = Timer(100, self._cf.close_link)
+        t = Timer(50, self._cf.close_link)
         t.start()
 
     def _stab_log_error(self, logconf, msg):
@@ -116,7 +118,10 @@ class Logger:
 
     def _stab_log_data(self, timestamp, data, logconf):
         """Callback from a the log API when data arrives"""
-
+        # print(f'[{timestamp}][{logconf.name}]: ', end='')
+        # for name, value in data.items():
+        #     print(f'{name}: {value:3.3f} ', end='')
+        # print()
         if not(self.block_callback):
             self.block_callback = True
             self.states['dt'] = timestamp - self.states['t']
@@ -145,7 +150,7 @@ class Logger:
 
 
     def _connection_failed(self, link_uri, msg):
-        """Callback when connection initial connection fails (i.e no Crazyflie
+        """Callback when connection initial connection fails (i.e no Crazyflie)
         at the specified address)"""
         print('Connection to %s failed: %s' % (link_uri, msg))
         self.is_connected = False
@@ -165,6 +170,7 @@ class Logger:
         print("VALUE OF STEP",abs(new_value-self.old_measurement ))
         if new_value-self.old_measurement >=20 and self.old_measurement !=0:
             print('FOUND LANDING PAD UPP')
+            
             return True
         elif new_value-self.old_measurement  <= -20 and self.old_measurement !=0:
             print('FOUND LANDING PAD DOWN')
@@ -172,7 +178,7 @@ class Logger:
         self.old_filtered = filtered
         self.old_measurement = new_value
         return False
-
+    
     def height_update(self) :
 
         self.states['z_range_hist'].pop(0)
@@ -249,6 +255,7 @@ if __name__ == '__main__':
             le.send_hover_setpoint(0, 0, 0, le.hover_height)
             time.sleep(0.1)
 
+
     def action_from_keyboard():
         forward_velocity = 0.0
         left_velocity = 0.0
@@ -280,190 +287,93 @@ if __name__ == '__main__':
         except:
             return [forward_velocity, left_velocity, yaw_rate, altitude]
 
-    def find_center_lp2(le, cf):
-        vx = le.states['vx']
-        vy = le.states['vy']
+    def find_center_landing_pad(le, cf):
+        
+        x_cross = le.states['stateEstimate.x'] - le.states['vx'] * (le.states['t'] - le.last_time_up)
+        y_cross = le.states['stateEstimate.y'] - le.states['vy'] * (le.states['t'] - le.last_time_up)
 
-        if abs(vx) > abs(vy) :  
-            le.send_hover_setpoint(0,0,0,le.hover_height)
-            time.sleep(0.5)
-
-            
-            le.send_hover_setpoint(0, 0.3, 0, le.hover_height)
-            time.sleep(1.5)
-
-            le.send_hover_setpoint(0,0,0,le.hover_height)
+        print("Start X shape from position : ", x_cross, y_cross)
+        for dx, dy in zip([0.1, -0.1, -0.1, 0.1], [0.1, 0.1, -0.1, -0.1]):
+            le.send_hover_setpoint(x_cross + dx, y_cross + dy, 0, le.desired_height)
+            print("Travel along : ", dx, dy, "for 1 second")
             time.sleep(1)
-
-            le.is_on_obstacle = False
-
-            while not(le.is_on_obstacle) :
-                le.send_hover_setpoint(0, -0.3, 0, le.hover_height)
-                time.sleep(0.1)
-            
-            le.send_hover_setpoint(0,0,0,le.hover_height)
-            time.sleep(0.5)
-
-        else : 
-            le.send_hover_setpoint(0,0,0,le.hover_height)
-            time.sleep(0.5)
-
-            le.send_hover_setpoint(0.3, 0, 0, le.hover_height)
-            time.sleep(1.5)
-            
-            le.send_hover_setpoint(0,0,0,le.hover_height)
+            print("Stabilizing on waypoint")
+            le.send_hover_setpoint(0, 0, 0, le.desired_height)
             time.sleep(1)
-
-            le.is_on_obstacle = False
-
-            while not(le.is_on_obstacle) :
-                le.send_hover_setpoint( -0.3, 0, 0, le.hover_height)
-                time.sleep(0.1)
-            
-            le.send_hover_setpoint(0.0,0,0,le.hover_height)
-            time.sleep(0.5)
-
-
-    map = Map()
-    # map.display_cell_map()
-    map.display_map_using_cv()
-    map.create_waypoints(True)
-    # The Crazyflie lib doesn't contain anything to keep the application alive,
-    # so this is where your application should do something. In our case we
-    # are just waiting until we are disconnected.
-
-    etat = 'Taking_off_1'
-    while le.is_connected :
-        try :
-            time.sleep(0.01)
-
-            if etat == 'Taking_off_1':
-                taking_off_drone(cf)
-                etat = 'Go_landing_zone'
-                cf.commander.send_position_setpoint(0,0,0.4, 0)
-                # etat = 'Go_landing_zone'
-
-            if etat == 'Keyboard':
-                command = action_from_keyboard()
-                cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
-                if command == None:
-                    etat = 'Landing_final'
-                map.update_map(le.states)
-                map.display_map_using_cv(le.states)
-
-            if etat == 'Go_landing_zone':
-                command = action_from_keyboard()
-                if command == None:
-                    etat = 'Landing_final'
-                le.HP_filter(le.states['range.zrange'])
-                # cf.commander.send_hover_setpoint(0, 0, 0, 0.4)
-                map.update_map(le.states)
-                start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
-                # start_cell = map.cell_from_pos([le.states["stateEstimate.x"] + 2.5, 1.5 + le.states["stateEstimate.y"]])
-                original_target = map.cell_from_pos((3.5 - map.x_start_pos, 1.5 - map.y_start_pos))
-                if map.grown_map[original_target] < 0:
-                    etat = 'Search_landing_pad'
-                map.perform_a_star(start_cell, original_target)
-                if len(map.optimal_cell_path) > 1:
-                    target_pos = map.simplify_path()
-                    cf.commander.send_position_setpoint(target_pos[0] ,
-                                                        target_pos[1] ,
-                                                        0.4,
-                                                        0)
-                else:
-                    etat = 'Search_landing_pad' 
-                    print(etat)
-                time.sleep(0.05)
-
-            if etat == 'Search_landing_pad':
-                # manual override
-                command = action_from_keyboard()
-                if command == None:
-                    etat = 'Landing_final'
-
-                # updating
-                is_on_step = le.is_on_obstacle
-                if is_on_step :
-                    etat = 'Search_center_pad'
-                else:
-                    map.update_map(le.states)
-                    map.update_height_map(le.states,is_on_step)
-                    
-                    start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
-
-                    map.perform_a_star(start_cell, map.get_current_waypoint())
-
-                    if len(map.optimal_cell_path) > 1:
-
-                        target_pos = map.simplify_path()
-                        cf.commander.send_position_setpoint(target_pos[0] ,
-                                                            target_pos[1] ,
-                                                            0.4,
-                                                            0)
-                    elif len(map.optimal_cell_path) == 1 : 
-
-                        map.perform_a_star(start_cell, map.get_next_waypoint())
-                        target_pos = map.simplify_path()
-                        cf.commander.send_position_setpoint(target_pos[0] ,
-                                                            target_pos[1] ,
-                                                            0.4,
-                                                            0)
-
-                
-                #etat = 'Search_center_pad'
-
-            if etat == 'Search_center_pad':
-                find_center_lp2(le,cf)
-                etat = 'Landing_1'
-
-            if etat == 'Landing_1':
-                landing_drone(cf)
-                time.step(0.5)
-                etat = 'Taking_off_2'
-
-            if etat == 'Taking_off_2':
-                taking_off_drone(cf)
-                etat = 'Go_starting_point'
-
-            if etat == 'Go_starting_point':
-                #manual override
-                command = action_from_keyboard()
-                if command == None:
-                    etat = 'Landing_final'
-                
-                map.update_map(le.states)
-                start_cell = map.cell_from_pos([le.states["stateEstimate.x"], le.states["stateEstimate.y"]])
-                end_cell = map.cell_from_pos([0,0])
-                map.perform_a_star(start_cell, end_cell)
-                if len(map.optimal_cell_path) > 1:
-                    target_pos = map.simplify_path()
-                    cf.commander.send_position_setpoint(target_pos[0] ,
-                                                        target_pos[1] ,
-                                                        0.4,
-                                                        0)
-                else:
-                    cf.commander.send_position_setpoint(0.0 ,
-                                                        0.0 ,
-                                                        0.4,
-                                                        0)
-                    etat = 'Landing_final'
-                    #need to refind the grid 
-                    time.sleep(0.3)
-                time.sleep(0.1)
-            
-            if etat == 'Landing_final':
-                landing_drone(cf)
-                etat = 'Finish'
-
-            if etat == 'Finish':
-                cf.commander.send_stop_setpoint()
-                le.is_connected = False
+            if le.is_on_obstacle :
+                print("Found landing pad for this waypoint")
                 break
 
-            map.display_map_using_cv(le.states)
-        except Exception as e: 
-            landing_drone(cf)
-            etat = 'Finish'
-            le.is_connected = False
-            print(e)
+
+
+
+        while le.is_on_obstacle :
+           le.send_hover_setpoint(parsing_speed, 0, 0, le.desired_height) 
+        
+        # Found top border !
+        x_center = le.states['stateEstimate.x'] - le.states['vx'] * (le.states['t'] - le.last_time_up) - length_lp/2.0
+
+        print("Found x_center : ", x_center)
+
+        #back up a bit
+        print("Backing up")
+        le.send_hover_setpoint(-parsing_speed, 0, 0, le.desired_height)
+        time.sleep(1)
+
+        while le.is_on_obstacle :
+           le.send_hover_setpoint(0, parsing_speed, 0, le.desired_height) 
+        
+        y_center = le.states['stateEstimate.y'] - le.states['vy'] * (le.states['t'] - le.last_time_up) - width_lp/2.0
+
+        print("Found y_center : ", y_center)
+        print("Converging back to center")
+        le.send_position_setpoint(x_center, y_center, 0, le.desired_height)
+        time.sleep(0.5)
+
+    
+
+
+    cf.param.set_value('kalman.resetEstimation', '1')
+    time.sleep(0.1)
+    cf.param.set_value('kalman.resetEstimation', '0')
+    time.sleep(2)
+
+
+    taking_off_drone(cf)
+
+    le.is_on_obstacle = False
+    print("Finished take-off")
+
+
+    for _ in range(400) :
+        if le.is_connected:
+            try :
+
+                command = action_from_keyboard()
+                if command == None:
+                    break
+                
+                le.send_hover_setpoint(command[0], command[1], command[2], le.desired_height)
+
+                if le.is_on_obstacle :
+                    print("Found landing pad !")
+                    find_center_lp2(le, cf)
+                    landing_drone(cf)
+                    cf.commander.send_stop_setpoint()
+                    le.is_connected = False
+                    break
+
+                time.sleep(0.1)
+            
+                
+            except Exception as e: 
+                print("Error ! ")
+                landing_drone(cf)
+                le.is_connected = False
+                print(e)
+
+    if le.is_connected :
+        landing_drone(cf)
+        cf.commander.send_stop_setpoint()
+        le.is_connected = False
 

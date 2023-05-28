@@ -36,8 +36,8 @@ class Map :
         self.plot_ready = False
 
         # Offsets
-        self.x_start_pos = 0.3
-        self.y_start_pos = 1.5
+        self.x_start_pos = 0.40
+        self.y_start_pos = 2.45
 
         # Waypoint related
         self.waypoints = []
@@ -340,9 +340,9 @@ class Map :
         nY = int((self.max_y - self.min_y) / self.res_pos)
 
         if start_from_left :
-            direction = -1
-        else : 
             direction = 1
+        else : 
+            direction = -1
 
         self.search_step = 4
         self.waypoints = []
