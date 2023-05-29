@@ -15,6 +15,8 @@ import numpy as np
 
 uri = uri_helper.uri_from_env(default='radio://0/70/2M/E7E7E7E707')
 
+#uri = uri_helper.uri_from_env(default='radio://0/60/2M/E7E7E7E716')
+
 # Only output errors from the logging framework
 logging.basicConfig(level=logging.ERROR)
 
@@ -186,7 +188,7 @@ class Logger:
 
 
         # print("VALUE OF STEP",new_value)
-        if z_hist[-2] - z_hist[-1] < - 15 and not(self.is_on_obstacle):
+        if z_hist[-2] - z_hist[-1] < - 17 and not(self.is_on_obstacle):
             print('FOUND LANDING PAD UP')
             self.is_on_obstacle = True
             self.last_time_up = self.states['t']
@@ -194,7 +196,7 @@ class Logger:
             # print("variance", np.std(z_hist))
 
 
-        elif z_hist[-2] - z_hist[-1] > + 15 and self.is_on_obstacle :
+        elif z_hist[-2] - z_hist[-1] > + 17 and self.is_on_obstacle :
             print('FOUND LANDING PAD DOWN')
             self.is_on_obstacle = False
             self.last_time_down = self.states['t']
@@ -287,11 +289,10 @@ if __name__ == '__main__':
 
         if abs(vx) > abs(vy) :  
             le.send_hover_setpoint(0,0,0,le.hover_height)
-            time.sleep(0.2)
+            #time.sleep(0.1)
 
-            
             le.send_hover_setpoint(0, 0.3, 0, le.hover_height)
-            time.sleep(1.5)
+            time.sleep(1)
 
             le.send_hover_setpoint(0,0,0,le.hover_height)
             time.sleep(1)
@@ -303,14 +304,14 @@ if __name__ == '__main__':
                 time.sleep(0.1)
             
             le.send_hover_setpoint(0,0,0,le.hover_height)
-            time.sleep(0.2)
+            #time.sleep(0.2)
 
         else : 
             le.send_hover_setpoint(0,0,0,le.hover_height)
-            time.sleep(0.2)
+            #time.sleep(0.1)
 
             le.send_hover_setpoint(0.3, 0, 0, le.hover_height)
-            time.sleep(1.5)
+            time.sleep(1)
             
             le.send_hover_setpoint(0,0,0,le.hover_height)
             time.sleep(1)
@@ -322,7 +323,7 @@ if __name__ == '__main__':
                 time.sleep(0.1)
             
             le.send_hover_setpoint(0.0,0,0,le.hover_height)
-            time.sleep(0.2)
+            #time.sleep(0.2)
 
 
     map = Map()
@@ -342,12 +343,11 @@ if __name__ == '__main__':
             taking_off_drone(cf)
             etat = 'Go_to_landing_area'
             print("State :", etat)
-            cf.commander.send_position_setpoint(0,0,0.4, 0)
             # etat = 'Go_to_landing_area'
 
         if etat == 'Keyboard':
             command = action_from_keyboard()
-            cf.commander.send_hover_setpoint(command[0], command[1], command[2], 0.4)
+            cf.commander.send_hover_setpoint(command[0], command[1], command[2], le.hover_height)
             if command == None:
                 etat = 'Final_landing'
                 print("State :", etat)
@@ -372,7 +372,7 @@ if __name__ == '__main__':
                 target_pos = map.simplify_path()
                 cf.commander.send_position_setpoint(target_pos[0] ,
                                                     target_pos[1] ,
-                                                    0.4,
+                                                    le.hover_height,
                                                     0)
             else:
                 etat = 'Search_landing_area' 
@@ -400,7 +400,10 @@ if __name__ == '__main__':
 
                 if map.optimal_cell_path is not None and len(map.optimal_cell_path) > 1:
 
-                    target_pos = map.simplify_path()
+                    if len(map.optimal_cell_path) > 3:
+                        target_pos = map.simplify_path()
+                    else :
+                        target_pos = map.pos_from_cell(map.optimal_cell_path[1])
                     cf.commander.send_position_setpoint(target_pos[0] ,
                                                         target_pos[1] ,
                                                         le.hover_height,
@@ -423,7 +426,6 @@ if __name__ == '__main__':
                                                         0)
 
             
-            #etat = 'Centering_on_landing_pad'
 
         if etat == 'Centering_on_landing_pad':
             find_center_lp2(le,cf)
@@ -441,6 +443,7 @@ if __name__ == '__main__':
         if etat == 'Taking_off_2':
             taking_off_drone(cf)
             etat = 'Go_to_starting_point'
+            le.is_on_obstacle = False
             map.create_final_waypoints()
             print("State :", etat)
 
@@ -465,7 +468,10 @@ if __name__ == '__main__':
 
                 if map.optimal_cell_path is not None and len(map.optimal_cell_path) > 1:
 
-                    target_pos = map.simplify_path()
+                    if len(map.optimal_cell_path) >3 :
+                        target_pos = map.simplify_path()
+                    else :
+                        target_pos = map.pos_from_cell(map.optimal_cell_path[1])
                     cf.commander.send_position_setpoint(target_pos[0] ,
                                                         target_pos[1] ,
                                                         le.hover_height,

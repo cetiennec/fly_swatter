@@ -373,9 +373,8 @@ class Map :
     def create_final_waypoints(self):
         self.waypoints = []
         start_cell = self.cell_from_pos([0.0, 0.0])
-        for i in [0,-1,1] :
-            for j in [0,-1, 1] :
-                self.waypoints.append((start_cell[0] + i, start_cell[1] + j))
+        for i,j in zip((1,0,-1,-1,-1, 1, 1), (0,0,0,1,-1,-1,1)):
+            self.waypoints.append((start_cell[0] + 3*i, start_cell[1] + 3*j))
 
         self.get_next_waypoint()
     
