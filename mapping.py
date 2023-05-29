@@ -36,8 +36,8 @@ class Map :
         self.plot_ready = False
 
         # Offsets
-        self.x_start_pos = 0.40
-        self.y_start_pos = 2.45
+        self.x_start_pos = 0.75
+        self.y_start_pos = 1.5
 
         # Waypoint related
         self.waypoints = []
@@ -86,10 +86,10 @@ class Map :
                 if dist < measurement:
                     self.bare_map[idx_x, idx_y] += self.conf
                 else:
-                    self.bare_map[idx_x, idx_y] -= 3 * self.conf
+                    self.bare_map[idx_x, idx_y] -= 3 * self.conf # Rather risk averse drone : obstacles grow 3 times faster than non-obstacles.
                     break
 
-        # roll the bare measurement map, as to enforce safety margin around the obstacles
+        # roll the bare measurement map, as to enforce safety margin around the obstacles = Obstacle growth
         self.bare_map = np.clip(self.bare_map, -1, 1)
         for i in range(-self.size_of_grown_margin, self.size_of_grown_margin + 1, 1):
             for j in range(
@@ -109,17 +109,24 @@ class Map :
 #%% Utils
 
     def pos_from_cell(self, cell):
+        """
+        Transforms cell postion into real-world position
+        """
         return (
             cell[1] * self.res_pos + self.min_x - self.x_start_pos,
             self.max_y - cell[0] * self.res_pos - self.y_start_pos,
         )
 
     def cell_from_pos(self, position):
+        """
+        Transforms real-world into cell position
+        """
         idx_x = int(np.round((self.max_y - position[1] - self.y_start_pos) / self.res_pos, 0))
         idx_y = int(np.round((position[0] - self.min_x + self.x_start_pos) / self.res_pos, 0))
         return (idx_x, idx_y)
     
     def merge_sorted_list(self, list1, list2, heuristics1, heuristics2):
+        """Algorithm merges two sorted lists"""
         result_list = []
         heuristics = []
         while len(list1) > 0 and len(list2) > 0: 
@@ -141,6 +148,9 @@ class Map :
         return result_list, heuristics
     
     def find_neighbors(self, cell):
+        """
+        Returns the neighbors of a given cell, restricting the cell index to valid ones, uses use_diagonal_neighbors flag
+        """
         cell_neighbors = []
         distances = []
 
@@ -176,52 +186,53 @@ class Map :
     def distance(self,cell_a,cell_b) :
         return np.linalg.norm(np.array(cell_a) - np.array(cell_b))
     
+    def simplify_path(self):
+        """
+        Takes the optimal_cell path, and returns the farthest point in the direction of motion (up to 3 steps ahead)
+        Is used when controlling the drone to speed it up in the position setpoint.
+        Helps to avoid jerky motion and enables faster locomotion.
+        """
+        if len(self.optimal_cell_path) > 2:
+            target_pos = self.pos_from_cell(self.optimal_cell_path[1])
+            i=1
+            next_target_pos = self.pos_from_cell(self.optimal_cell_path[1+i])
+
+            while target_pos[0]==next_target_pos[0] and (len(self.optimal_cell_path)>i+2 and i < 3):
+                i+=1
+                next_target_pos = self.pos_from_cell(self.optimal_cell_path[1 + i])
+            j=1
+            next_target_pos = self.pos_from_cell(self.optimal_cell_path[1+j])
+
+            while target_pos[1] == next_target_pos[1] and (len(self.optimal_cell_path)>2+j and j < 3):
+                j += 1
+                next_target_pos = self.pos_from_cell(self.optimal_cell_path[1 + j])
+
+            if i>1:
+                return self.pos_from_cell(self.optimal_cell_path[i])
+            if j>1:
+                return self.pos_from_cell(self.optimal_cell_path[j])
+            else :
+                return target_pos
+
+        elif len(self.optimal_cell_path) == 2:
+            return self.pos_from_cell(self.optimal_cell_path[1])
+
+        elif len(self.optimal_cell_path) == 1:
+            return self.pos_from_cell(self.optimal_cell_path[0])
+    
 
 #%% Display the map
-    # def display_cell_map(self, sensor_data=None):
-    #     if not self.plot_ready:
-    #         plt.ion()
-    #         plt.subplot(131)
-    #         self.cell_map_plot = plt.imshow(
-    #             np.transpose(self.grown_map), vmin=-1, vmax=1, cmap="gray", origin="lower"
-    #         )
-    #         (self.optimal_cell_path_plot,) = plt.plot(0, 0, "go")
-    #         (self.cell_pos_plot,) = plt.plot(0, 0, "r+")
-    #         (self.waypoint_plot,) = plt.plot(0, 0, "bx")
 
-    #         plt.title("Cell map and planned path")
-    #         plt.xlabel("cX")
-    #         plt.ylabel("cY")
-
-    #         self.plot_ready = True
-
-    #     # update map data and flip the map , so it appears with the same coordinate system as simulation
-    #     self.cell_map_plot.set_data(np.transpose(self.grown_map))
-
-    #     # get position
-    #     if sensor_data is not None :
-    #         idx_x, idx_y = self.cell_from_pos(
-    #             [self.x_start_pos + sensor_data["stateEstimate.x"], self.y_start_pos + sensor_data["stateEstimate.y"]]
-    #         )
-    #         self.cell_pos_plot.set_xdata(idx_x)
-    #         self.cell_pos_plot.set_ydata(idx_y)
-
-    #     if self.waypoint is not None:
-    #         self.waypoint_plot.set_xdata(self.waypoint[0])
-    #         self.waypoint_plot.set_ydata(self.waypoint[1])
-
-    #     if self.optimal_cell_path is not None:
-    #         self.optimal_cell_path_plot.set_xdata(
-    #             [cell[0] for cell in self.optimal_cell_path]
-    #         )
-    #         self.optimal_cell_path_plot.set_ydata(
-    #             [cell[1] for cell in self.optimal_cell_path]
-    #         )
-
-    #     plt.pause(0.001)
-
-    def display_map_using_cv(self, sensor_data = None, state = 'Unknown state'):
-        upscaling_factor = 20
+    def display_map_using_cv(self, sensor_data = None, state = 'Take-off'):
+        """
+        Displays the cell map with :
+        - current position
+        - target_position
+        - optimal path to this position
+        - waypoints
+        Uses the OpenCV library for fast display rather than previous plt implementation
+        """
+        upscaling_factor = 20 # defines final size of the displayed window
         gray_image = np.transpose(self.grown_map)
         gray_image = (gray_image+1)/2
 
@@ -251,12 +262,10 @@ class Map :
         map_image = cv2.putText(map_image, "State : " + state, (10,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color=(0,0.9,1))
         cv2.imshow('Cell map and planned path', map_image)
         cv2.waitKey(1)
-    
-
-
 
     
 #%% Path planning : A* algorithm
+
     def perform_a_star(self, start_cell, target_cell):
         self.grown_map_astar = np.zeros_like(self.grown_map)  # unmarked at 0
         self.grown_map_astar[self.grown_map < 0] = -1  # to keep convention
@@ -265,7 +274,7 @@ class Map :
 
         for i in range(len(cameFrom)):
             for j in range(len(cameFrom[i])):
-                cameFrom[i,j] = start_cell
+                cameFrom[i,j] = start_cell 
 
 
         cells_to_explore = [start_cell]
@@ -341,9 +350,13 @@ class Map :
         self.optimal_cell_path.reverse()
 
 
-#%% Everything related to the waypoints
+#%% Waypoints management
 
     def create_waypoints(self, start_from_left = True):
+        """
+        Create the waypoints for the parsing of the landing area
+        Searches in an S pattern
+        """
         nX = int(1.5 / self.res_pos) # height of the landing zone
         offsetX = int(3.5 / self.res_pos) # where the landing zone starts from
         nY = int((self.max_y - self.min_y) / self.res_pos)
@@ -356,6 +369,7 @@ class Map :
         self.search_step = 4
         self.waypoints = []
         for idx_x in range(1, nX - 1, 3):
+            # Create lines of alternate direction for the waypoint, so that the drone looks in a S pattern
             if direction == 1:
                 for idx_y in range(2, nY -1 , self.search_step):
                     self.waypoints.append((idx_y, offsetX + idx_x))
@@ -368,9 +382,13 @@ class Map :
                         )
                     )
             direction = -direction
-        self.get_next_waypoint()
+        self.get_next_waypoint() #extract first one as current_waypoint
 
     def create_final_waypoints(self):
+        """
+        Create waypoints for the search of the starting pad upon return
+        Sort of H pattern for search.
+        """
         self.waypoints = []
         start_cell = self.cell_from_pos([0.0, 0.0])
         for i,j in zip((1,0,-1,-1,-1, 1, 1), (0,0,0,1,-1,-1,1)):
@@ -379,6 +397,9 @@ class Map :
         self.get_next_waypoint()
     
     def get_next_waypoint(self):
+        """
+        Returns next unoccupied waypoint
+        """
         if len(self.waypoints) < 1:
             self.create_waypoints()
 
@@ -392,6 +413,7 @@ class Map :
         return self.current_waypoint
     
     def get_current_waypoint(self):
+        """ Returns current waypoint or next free one"""
         if self.current_waypoint is None :
             self.create_waypoints()
 
@@ -400,39 +422,13 @@ class Map :
         return self.current_waypoint
 
     def update_height_map(self, sensor_data, is_on_step) :
+        # Unused but poke on height use in searching the landing area
         cell = self.cell_from_pos([sensor_data["stateEstimate.x"],  sensor_data["stateEstimate.y"]])
         if is_on_step :
             self.height_map[cell] = 1
-    
-    def simplify_path(self):
-        # return the farest point to be reached
-        if len(self.optimal_cell_path) > 2:
-            target_pos = self.pos_from_cell(self.optimal_cell_path[1])
-            i=1
-            next_target_pos = self.pos_from_cell(self.optimal_cell_path[1+i])
 
-            while target_pos[0]==next_target_pos[0] and (len(self.optimal_cell_path)>i+2 and i < 3):
-                i+=1
-                next_target_pos = self.pos_from_cell(self.optimal_cell_path[1 + i])
-            j=1
-            next_target_pos = self.pos_from_cell(self.optimal_cell_path[1+j])
+   
 
-            while target_pos[1] == next_target_pos[1] and (len(self.optimal_cell_path)>2+j and j < 3):
-                j += 1
-                next_target_pos = self.pos_from_cell(self.optimal_cell_path[1 + j])
-
-            if i>1:
-                return self.pos_from_cell(self.optimal_cell_path[i])
-            if j>1:
-                return self.pos_from_cell(self.optimal_cell_path[j])
-            else :
-                return target_pos
-
-        elif len(self.optimal_cell_path) == 2:
-            return self.pos_from_cell(self.optimal_cell_path[1])
-
-        elif len(self.optimal_cell_path) == 1:
-            return self.pos_from_cell(self.optimal_cell_path[0])
             
     
 
